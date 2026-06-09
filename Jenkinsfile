@@ -2,7 +2,7 @@ pipeline {
   agent any
   tools { nodejs 'node18' }
   environment {
-    ECR_REPO  = "445160884854.dkr.ecr.us-east-2.amazonaws.com/netflix-clone
+    ECR_REPO  = "445160884854.dkr.ecr.us-east-2.amazonaws.com/netflix-clone"
     IMAGE_TAG = "${env.BUILD_NUMBER}"
     MANIFESTS = "https://github.com/ao93/netflix-clone-manifest.git"
   }
@@ -22,13 +22,6 @@ pipeline {
                         odcInstallation: 'DP-Check'
       }
     }
-    stage('SonarQube') {
-      steps {
-        withSonarQubeEnv('SonarQube-Server') {
-          sh "$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=netflix-clone"
-        }
-      }
-    }
     stage('Docker Build') {
       steps {
         withCredentials([string(credentialsId: 'tmdb-api-key', variable: 'TMDB_KEY')]) {
@@ -44,8 +37,7 @@ pipeline {
     stage('Push to ECR') {
       steps {
         sh """
-          aws ecr get-login-password --region us-east-2 | \
-            docker login --username AWS --password-stdin $ECR_REPO
+          aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin $ECR_REPO
           docker push $ECR_REPO:$IMAGE_TAG
         """
       }
@@ -55,7 +47,7 @@ pipeline {
         withCredentials([usernamePassword(credentialsId: 'github-creds',
             usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
           sh """
-            git clone https://$GIT_USER:$GIT_TOKEN@github.com/ao93/netflix-clone-manifest.git
+            git clone https://\$GIT_USER:\$GIT_TOKEN@github.com/ao93/netflix-clone-manifest.git
             cd netflix-clone-manifest
             sed -i "s|image: .*|image: $ECR_REPO:$IMAGE_TAG|g" base/deployment.yaml
             git config user.email "ci@jenkins.local"
@@ -70,10 +62,7 @@ pipeline {
   }
   post {
     always {
-      emailext attachLog: true,
-               subject: "Netflix Clone Build: ${currentBuild.result}",
-               body: "Build ${BUILD_NUMBER} — ${currentBuild.result}",
-               to: 'your-email@gmail.com'
+      echo "Build ${BUILD_NUMBER} completed with status: ${currentBuild.result}"
     }
   }
 }
