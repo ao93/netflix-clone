@@ -2,7 +2,7 @@ pipeline {
   agent any
   tools { nodejs 'node18' }
   environment {
-    ECR_REPO  = 445160884854.dkr.ecr.us-east-2.amazonaws.com/netflix-clone
+    ECR_REPO  = "445160884854.dkr.ecr.us-east-2.amazonaws.com/netflix-clone
     IMAGE_TAG = "${env.BUILD_NUMBER}"
     MANIFESTS = "https://github.com/ao93/netflix-clone-manifest.git"
   }
@@ -44,7 +44,7 @@ pipeline {
     stage('Push to ECR') {
       steps {
         sh """
-          aws ecr get-login-password --region us-east-1 | \
+          aws ecr get-login-password --region us-east-2 | \
             docker login --username AWS --password-stdin $ECR_REPO
           docker push $ECR_REPO:$IMAGE_TAG
         """
