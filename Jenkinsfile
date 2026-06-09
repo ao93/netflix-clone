@@ -14,7 +14,7 @@ pipeline {
       }
     }
     stage('Install Dependencies') {
-      steps { sh 'npm ci' }
+      steps { sh 'yarn install' }
     }
     stage('OWASP Dep-Check') {
       steps {
