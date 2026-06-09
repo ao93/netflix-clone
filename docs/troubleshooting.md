@@ -1,14 +1,3 @@
-
-6/4/2026
-
-Documentation issues
-
-Here's your full documentation — save this to your repo:
-bash
-code ~/netflix-clone/docs/troubleshooting.md
-Paste this in and save with Command + S:
-
-markdown
 # Troubleshooting Log — DevSecOps Netflix Clone Project
 **Date:** June 4, 2026  
 **Engineer:** Adolfo Ovalles  
@@ -184,14 +173,6 @@ Is the IP correct? Is the OS compatible?
 These are exactly the skills that matter in a DevOps engineering role — 
 staying calm, reading error messages carefully, and working through problems 
 one layer at a time.
-
-Then push it to GitHub:
-bash
-cd ~/netflix-clone
-git add .
-git commit -m "docs: add troubleshooting log for EC2 and Jenkins setup"
-git push origin main
-This is genuinely strong portfolio material, Adolfo — four real issues, real diagnosis steps, real fixes. That's exactly what interviewers want to see. Now, are you on the Jenkins unlock page?
 
 
 ## Issue 5 — Jenkins UI Unreachable on Port 8080 (ISP Port Blocking)
