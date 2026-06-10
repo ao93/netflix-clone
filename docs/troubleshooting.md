@@ -349,3 +349,216 @@ IAM. The key skill is reading the error message carefully — it tells
 you exactly which action is denied and which resource it applies to.
 Learning to create custom IAM policies is a core DevOps competency 
 that directly translates to the job.
+
+## Issue 7 — Disk Full on Jenkins EC2 (ENOSPC)
+
+**Date:** June 9, 2026
+**Engineer:** Adolfo Ovalles
+**Project:** Netflix Clone on AWS with Jenkins CI/CD
+
+---
+
+### Problem
+Jenkins pipeline failed during `yarn install` with `ENOSPC: no space left on device`.
+
+### Symptoms
+```bash
+error https://registry.yarnpkg.com/esbuild-freebsd-64/-/esbuild-freebsd-64-0.15.12.tgz: 
+ENOSPC: no space left on device, write
+```
+
+### Root Cause
+EC2 root volume was only 8GB despite setting 30GB at launch — 
+the storage setting didn't save properly during instance creation.
+Installing Java, Jenkins, Docker, Trivy, Node.js, npm and yarn 
+filled the 8GB volume completely.
+
+### Diagnosis
+```bash
+df -h
+# /dev/root  6.7G  6.6G  27M  100%  /
+```
+
+### Resolution
+1. Go to AWS console → EC2 → Volumes
+2. Select the jenkins-server volume
+3. Actions → Modify volume → change 8 to 30
+4. Then on EC2:
+```bash
+sudo growpart /dev/nvme0n1 1
+sudo resize2fs /dev/root
+df -h
+# /dev/root  28G  6.6G  22G  24%  /
+```
+
+### Lesson Learned
+Always verify the actual disk size after launching an EC2 instance.
+The AWS console storage setting doesn't always apply correctly.
+Run `df -h` as one of the first checks when setting up a new server.
+
+---
+
+## Issue 8 — yarn not found on Jenkins EC2
+
+**Date:** June 9, 2026
+**Engineer:** Adolfo Ovalles
+**Project:** Netflix Clone on AWS with Jenkins CI/CD
+
+---
+
+### Problem
+Jenkins pipeline failed with `yarn: not found` during Install Dependencies stage.
+
+### Symptoms
+```bash
+/root/.jenkins/workspace/netflix-clone-pipeline@tmp/durable-88d3bec2/script.sh.copy: 
+1: yarn: not found
+```
+
+### Root Cause
+yarn was not installed globally on the EC2 instance.
+Jenkins installs Node.js in its workspace but not yarn globally.
+
+### Resolution
+```bash
+sudo apt-get install -y npm
+sudo npm install -g yarn
+yarn --version
+# 1.22.22
+```
+
+### Lesson Learned
+Jenkins tool installations are workspace-scoped. Global tools like
+yarn need to be installed separately on the EC2 instance.
+
+---
+
+## Issue 9 — Dockerfile Using npm ci Instead of yarn
+
+**Date:** June 9, 2026
+**Engineer:** Adolfo Ovalles
+**Project:** Netflix Clone on AWS with Jenkins CI/CD
+
+---
+
+### Problem
+Docker build failed because Dockerfile used `npm ci` but the app 
+uses yarn and has no `package-lock.json`.
+
+### Symptoms
+```bash
+npm error The `npm ci` command can only install with an existing 
+package-lock.json or npm-shrinkwrap.json with lockfileVersion >= 1.
+```
+
+### Resolution
+Updated Dockerfile to use yarn:
+```dockerfile
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+COPY . .
+ARG TMDB_V3_API_KEY
+ENV VITE_APP_TMDB_V3_API_KEY=$TMDB_V3_API_KEY
+RUN yarn build
+
+FROM nginx:stable-alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Lesson Learned
+Always match the package manager in the Dockerfile with the one
+used in the project. If the project has a `yarn.lock` file, use
+yarn in the Dockerfile. If it has `package-lock.json`, use npm.
+
+---
+
+## Issue 10 — EKS Nodes Too Small for ArgoCD (t3.micro)
+
+**Date:** June 9, 2026
+**Engineer:** Adolfo Ovalles
+**Project:** Netflix Clone on AWS with Jenkins CI/CD
+
+---
+
+### Problem
+ArgoCD pods were stuck in `Pending` state after installation on EKS.
+
+### Symptoms
+```bash
+kubectl get pods -n argocd
+# All pods showing 0/1 Pending
+
+kubectl describe pod argocd-server -n argocd
+# 0/2 nodes are available: 2 Too many pods.
+```
+
+### Root Cause
+`t3.micro` instances have a maximum of 4 pods per node.
+EKS system pods already used all available pod slots before
+ArgoCD pods could be scheduled.
+
+### Resolution
+1. Deleted old nodegroup:
+```bash
+eksctl delete nodegroup \
+  --cluster netflix-cluster \
+  --region us-east-2 \
+  --name netflix-nodes \
+  --disable-eviction
+```
+2. Created new nodegroup with `t3.small`:
+```bash
+eksctl create nodegroup \
+  --cluster netflix-cluster \
+  --region us-east-2 \
+  --name netflix-nodes-v2 \
+  --node-type t3.small \
+  --nodes 2 \
+  --nodes-min 1 \
+  --nodes-max 4 \
+  --managed
+```
+
+### Lesson Learned
+`t3.micro` is too small for production Kubernetes workloads.
+Use at minimum `t3.small` for EKS nodes. Always check the
+pod limit per instance type before choosing your node size.
+For reference:
+- t3.micro: 4 pods max
+- t3.small: 11 pods max
+- t3.medium: 17 pods max
+
+---
+
+## 🎉 Pipeline SUCCESS — Build 10
+
+**Date:** June 9, 2026
+
+### What worked end to end:
+1. Jenkins pulled code from GitHub
+2. yarn install — dependencies installed
+3. Docker build — Netflix clone image built successfully
+4. Trivy scan — 1 HIGH vulnerability found (libxml2 CVE-2026-6732)
+5. ECR push — image pushed to AWS ECR
+6. Manifests repo updated — deployment.yaml image tag updated
+7. ArgoCD detected change and deployed to EKS
+
+### Total builds to get pipeline working: 10
+### Total issues resolved: 10
+
+### Reflection
+Getting a DevSecOps pipeline working from scratch is never
+a straight line. Every error was a learning opportunity:
+- IAM permissions in AWS require granular configuration
+- Disk space management is critical on EC2
+- Package managers must match between local dev and Docker
+- Kubernetes node sizing directly impacts pod scheduling
+- Network troubleshooting requires a layered approach
+
+Each of these issues is something real DevOps engineers face
+daily. Having documented solutions makes you a stronger
+candidate and a better engineer.
