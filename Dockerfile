@@ -5,8 +5,8 @@ RUN yarn install --frozen-lockfile
 COPY . .
 ARG TMDB_V3_API_KEY
 ARG API_ENDPOINT_URL=https://api.themoviedb.org/3
-ENV VITE_APP_TMDB_V3_API_KEY=$TMDB_V3_API_KEY
-ENV VITE_APP_API_ENDPOINT_URL=$API_ENDPOINT_URL
+RUN echo "VITE_APP_TMDB_V3_API_KEY=${TMDB_V3_API_KEY}" > .env && \
+    echo "VITE_APP_API_ENDPOINT_URL=${API_ENDPOINT_URL}" >> .env
 RUN yarn build
 
 FROM nginx:stable-alpine
