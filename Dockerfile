@@ -6,7 +6,8 @@ COPY . .
 ARG TMDB_V3_API_KEY
 ARG API_ENDPOINT_URL=https://api.themoviedb.org/3
 RUN echo "VITE_APP_TMDB_V3_API_KEY=${TMDB_V3_API_KEY}" > .env && \
-    echo "VITE_APP_API_ENDPOINT_URL=${API_ENDPOINT_URL}" >> .env
+    echo "VITE_APP_API_ENDPOINT_URL=${API_ENDPOINT_URL}" >> .env && \
+    cat .env
 RUN yarn build
 
 FROM nginx:stable-alpine
