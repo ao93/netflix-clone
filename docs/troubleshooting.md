@@ -562,3 +562,138 @@ a straight line. Every error was a learning opportunity:
 Each of these issues is something real DevOps engineers face
 daily. Having documented solutions makes you a stronger
 candidate and a better engineer.
+
+### Diagnosis Steps
+1. Confirmed app was loading — nginx logs showed 200 responses
+2. Opened browser DevTools → Network tab → filtered by `themoviedb`
+3. Found 401 errors on all TMDB API calls
+4. Discovered app was using a JWT Bearer token instead of API key
+5. Found that Vite bakes environment variables into the bundle at 
+   BUILD TIME — not runtime
+6. `ENV` instruction in Dockerfile sets runtime variables — Vite 
+   ignores these
+7. `ARG` + `ENV` approach also failed — Vite reads `.env` files, 
+   not shell environment variables
+8. Fix: write a `.env` file during Docker build BEFORE `yarn build` runs
+
+### Resolution
+Updated Dockerfile to create `.env` file before build:
+```dockerfile
+ARG TMDB_V3_API_KEY
+ARG API_ENDPOINT_URL=https://api.themoviedb.org/3
+RUN echo "VITE_APP_TMDB_V3_API_KEY=${TMDB_V3_API_KEY}" > .env && \
+    echo "VITE_APP_API_ENDPOINT_URL=${API_ENDPOINT_URL}" >> .env
+RUN yarn build
+```
+
+Also updated apiSlice.ts to use Bearer token auth:
+```typescript
+baseQuery: fetchBaseQuery({
+  baseUrl: API_ENDPOINT_URL,
+  prepareHeaders: (headers) => {
+    headers.set("Authorization", `Bearer ${TMDB_V3_API_KEY}`);
+    return headers;
+  },
+}),
+```
+
+Used TMDB **Read Access Token (v4 auth)** — the long JWT token — 
+instead of the short API key v3.
+
+### Lesson Learned
+Vite is a build-time bundler. Environment variables prefixed with 
+`VITE_APP_` are replaced with their actual values during `yarn build`. 
+They CANNOT be injected at runtime like regular environment variables.
+
+The correct pattern for Docker + Vite:
+1. Pass secrets as Docker `--build-arg`
+2. Write them to a `.env` file inside the container
+3. Run `yarn build` AFTER the `.env` file exists
+
+This is different from Node.js/Express apps where env vars can be 
+injected at runtime.
+
+---
+
+## Issue 12 — Missing Public Assets (Netflix Logo, Avatar)
+
+**Date:** June 11, 2026
+**Engineer:** Adolfo Ovalles
+**Project:** Netflix Clone on AWS with Jenkins CI/CD
+
+---
+
+### Problem
+Netflix clone app loaded movies correctly but Netflix logo and 
+user avatar images were broken/missing.
+
+### Root Cause
+When copying source files from the original repo, the `public/` 
+folder was not included. Vite serves static assets from the `public/` 
+folder — these are copied directly to the build output without processing.
+
+### Resolution
+```bash
+git clone https://github.com/Aj7Ay/Netflix-clone.git temp-assets
+cp -r temp-assets/public ~/netflix-clone/
+rm -rf temp-assets
+git add .
+git commit -m "fix: add public assets folder with logos"
+git push origin main
+```
+
+### Lesson Learned
+When migrating a Vite/React app, always check for a `public/` folder. 
+It contains static assets like images, icons, and manifest files that 
+are served directly without being processed by the bundler.
+
+---
+
+## 🎯 Final Project Summary
+
+**Date Completed:** June 11, 2026
+**Engineer:** Adolfo Ovalles
+**Total Build Attempts:** 23
+**Total Issues Resolved:** 12
+
+### Complete Tech Stack Built
+- **Source Control:** GitHub (2 repos — app + manifests)
+- **CI/CD:** Jenkins on AWS EC2 (m7i-flex.large)
+- **Security Scanning:** Trivy (container CVE scanning)
+- **Container Registry:** Amazon ECR
+- **Container Orchestration:** Amazon EKS (Kubernetes 1.34)
+- **GitOps:** ArgoCD
+- **App:** Netflix Clone (React + TypeScript + Vite + TMDB API)
+- **Web Server:** nginx (alpine)
+- **Monitoring:** Prometheus + Grafana (installed)
+
+### Pipeline Flow
+
+
+
+### Key Skills Demonstrated
+1. End-to-end CI/CD pipeline design and implementation
+2. Container security scanning with Trivy
+3. GitOps deployment with ArgoCD
+4. Kubernetes cluster management on EKS
+5. IAM permissions troubleshooting on AWS
+6. Network connectivity troubleshooting (IPv4/IPv6, ISP blocking)
+7. SSH tunneling for restricted networks
+8. Docker multi-stage builds
+9. Vite build-time environment variable injection
+10. Kubernetes pod scheduling and resource management
+
+### Reflection
+This project taught me that real DevOps engineering is 90% 
+troubleshooting and 10% following instructions. Every layer of 
+the stack — networking, IAM, containers, Kubernetes, build tools — 
+had its own quirks that required systematic diagnosis.
+
+The most valuable skill I developed was not any specific tool, but 
+the methodology: isolate the layer, read the error carefully, 
+test the hypothesis, fix it, document it. That approach works 
+regardless of the technology.
+
+Every issue I hit and resolved is something real DevOps engineers 
+face on the job. This project is proof that I can handle the 
+complexity of real cloud infrastructure.
